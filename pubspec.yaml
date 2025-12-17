@@ -18,7 +18,7 @@ dependencies:
   supabase_flutter: ^2.10.3
 
   # --- DARI FITUR PROFILE ---
-  image_picker: ^1.0.4          # Untuk ambil foto dari galeri/kamera
+  image_picker: ^1.0.7          # Untuk ambil foto dari galeri/kamera
   shared_preferences: ^2.0.15   # Untuk simpan sesi login/data lokal
   path_provider: ^2.0.14        # Untuk akses direktori file sistem
 

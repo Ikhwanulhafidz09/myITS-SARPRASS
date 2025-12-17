@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+// --- IMPORT CONFIG & PAGES ---
+import 'pages/supabase_config.dart';
 import 'pages/home_page.dart';
-import 'pages/search_page.dart';
+import 'pages/search_page.dart'; // Pastikan di dalam file ini class-nya bernama SearchRuanganPage
 import 'pages/informations/information_page.dart';
 import 'pages/welcome_screen/welcome.dart'; 
-import 'pages/supabase_config.dart'; 
-import 'pages/profile.dart';
+import 'pages/profile/profile.dart';
+
+// --- IMPORT AUTH PAGES ---
+import 'pages/login-register/login_page.dart'; 
+import 'pages/login-register/register_page.dart'; 
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +23,9 @@ Future<void> main() async {
 
   runApp(const MyApp());
 }
+
+// Variabel global untuk akses klien Supabase (Dibutuhkan oleh AuthGate)
+final supabase = Supabase.instance.client;
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -32,7 +40,75 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Roboto',
       ),
-      home: const WelcomeScreen(), 
+      // AuthGate sebagai gerbang utama: Cek Login atau Belum
+      home: const AuthGate(), 
+    );
+  }
+}
+
+// ============================================
+// AUTH GATE (Pengecekan Status Login)
+// ============================================
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<AuthState>(
+      stream: supabase.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        // Saat pertama kali load/tunggu koneksi
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+
+        final session = snapshot.data?.session;
+
+        if (session != null) {
+          // JIKA SUDAH LOGIN -> Masuk ke Aplikasi Utama
+          return const MainScreen();
+        } else {
+          // JIKA BELUM LOGIN -> Tampilkan Welcome Screen
+          return const WelcomeScreen();
+        }
+      },
+    );
+  }
+}
+
+// ============================================
+// AUTH FLOW (Logic Pindah Login <-> Register)
+// ============================================
+// Widget ini opsional jika WelcomeScreen Anda sudah handle switch form sendiri,
+// tapi tetap saya sertakan agar tidak ada error referensi dari file lain.
+class AuthFlow extends StatefulWidget {
+  const AuthFlow({super.key});
+
+  @override
+  State<AuthFlow> createState() => _AuthFlowState();
+}
+
+class _AuthFlowState extends State<AuthFlow> {
+  int _currentPage = 0; // 0 = Login, 1 = Register
+
+  void _navigateToSignIn() {
+    setState(() => _currentPage = 0);
+  }
+
+  void _navigateToSignUp() {
+    setState(() => _currentPage = 1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentPage,
+        children: [
+          LoginPage(onSignUpPressed: _navigateToSignUp), 
+          RegisterPage(onSignInPressed: _navigateToSignIn), 
+        ],
+      ),
     );
   }
 }
@@ -40,7 +116,6 @@ class MyApp extends StatelessWidget {
 // ============================================
 // MAIN SCREEN (Halaman Utama dengan BottomNav)
 // ============================================
-
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -52,15 +127,17 @@ class MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   int _infoTabInitialIndex = 0;
 
-  // Fungsi untuk membuka tab Info pada sub-tab tertentu (misal: FAQ)
+  // Fungsi untuk pindah ke tab Info secara spesifik (Public)
   void openInfoPage(int subTabIndex) {
     setState(() {
-      _selectedIndex = 3; // Pindah ke Tab Info (Index 3)
-      _infoTabInitialIndex = subTabIndex; // Set sub-tab
+      _selectedIndex = 3; // Index Tab Info
+      _infoTabInitialIndex = subTabIndex; 
     });
   }
 
-  void _onItemTapped(int index) {
+  // ✅ PERBAIKAN: Fungsi ini sekarang PUBLIC (tanpa garis bawah)
+  // Supaya bisa dipanggil dari HomePage (context.findAncestorStateOfType...)
+  void onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
@@ -69,11 +146,11 @@ class MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
-      const HomePage(),                                       // Index 0: Home
-      const Center(child: Text('Halaman Riwayat')),           // Index 1: Riwayat (Placeholder)
-      const SearchRuanganPage(),                              // Index 2: Search
-      InformationPage(initialIndex: _infoTabInitialIndex),    // Index 3: Info
-      const ProfilePage(),                                    // Index 4: Profile
+      const HomePage(),                                       
+      const Center(child: Text('Halaman Riwayat')),           
+      const SearchRuanganPage(),                              
+      InformationPage(initialIndex: _infoTabInitialIndex),    
+      const ProfilePage(),                                    
     ];
 
     return Scaffold(
@@ -82,34 +159,21 @@ class MainScreenState extends State<MainScreen> {
         index: _selectedIndex,
         children: pages,
       ),
-      
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFF1E3A8A),
         unselectedItemColor: Colors.grey,
         currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
+        
+        // ✅ Panggil fungsi public yang baru
+        onTap: onItemTapped, 
+        
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home), 
-            label: 'Home'
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history), 
-            label: 'Riwayat'
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search), 
-            label: 'Search'
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.info_outline), 
-            label: 'Info'
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline), 
-            label: 'Profile'
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Riwayat'),
+          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
+          BottomNavigationBarItem(icon: Icon(Icons.info_outline), label: 'Info'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
         ],
       ),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../main.dart'; 
+import 'package:myits_sarprass/pages/login-register/login_page.dart';
+import 'package:myits_sarprass/pages/login-register/register_page.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -9,281 +10,348 @@ class WelcomeScreen extends StatefulWidget {
 }
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
-  // --- STATE VARIABLES ---
+  // --- STATIC VARIABLE (Ingatan Global) ---
+  // Variabel ini tidak akan hilang meskipun widget di-refresh oleh AuthGate.
+  // false = Animasi intro belum pernah jalan (Awal buka aplikasi).
+  // true = Animasi sudah pernah jalan (Balik dari register/logout).
+  static bool _hasPlayedIntro = false;
+
+  // --- ANIMATION STATE ---
   bool _showKey = false;
   bool _moveKeyToSide = false;
   bool _showText = false;
   bool _hideLogoBeforeSlide = false;
   double _blueHeight = 0.0;
-  bool _showFinalUI = false;
+  
+  // --- UI MODE STATE ---
+  bool _isFormOpen = false;
+  bool _showLoginForm = true; 
+  bool _animationCompleted = false;
 
   @override
   void initState() {
     super.initState();
-    _startAnimationSequence();
+    // Jalankan logika pengecekan saat layar dimuat
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAnimationLogic();
+    });
   }
 
-  Future<void> _startAnimationSequence() async {
-    // 1. Layar Putih (1 detik)
+  Future<void> _checkAnimationLogic() async {
+    final double screenHeight = MediaQuery.of(context).size.height;
+
+    // KONDISI 1: Jika Intro SUDAH pernah diputar (User habis Register / Logout)
+    // Langsung set tampilan akhir dan BUKA form login.
+    if (_hasPlayedIntro) {
+      setState(() {
+        // Set posisi aset seolah animasi sudah selesai
+        _showKey = true;
+        _moveKeyToSide = true;
+        _showText = true;
+        _hideLogoBeforeSlide = true;
+        
+        // Background biru langsung full
+        _blueHeight = screenHeight;
+        
+        // UI Akhir aktif
+        _animationCompleted = true;
+        
+        // LANGSUNG BUKA FORM LOGIN
+        _isFormOpen = true; 
+        _showLoginForm = true; 
+      });
+      return; // Stop, jangan jalankan animasi lagi
+    }
+
+    // KONDISI 2: Jika Intro BELUM pernah diputar (Baru buka aplikasi)
+    // Jalankan animasi dari nol.
+    await _startIntroAnimation(screenHeight);
+    
+    // Tandai bahwa intro sudah selesai diputar
+    _hasPlayedIntro = true;
+  }
+
+  Future<void> _startIntroAnimation(double screenHeight) async {
+    // 1. Delay Awal
     await Future.delayed(const Duration(seconds: 1));
-
-    // 2. Kunci Muncul (Besar & Tengah)
     if (mounted) setState(() => _showKey = true);
+    
+    // 2. Geser Kunci
     await Future.delayed(const Duration(milliseconds: 1000));
-
-    // 3. Kunci Geser + Teks Muncul
     if (mounted) {
       setState(() {
-        _moveKeyToSide = true; 
+        _moveKeyToSide = true;
         _showText = true;
       });
     }
     
-    // Tahan Logo
+    // 3. Tahan sebentar
     await Future.delayed(const Duration(seconds: 2));
-
-    // 4. Logo Fade Out
-    if (mounted) setState(() => _hideLogoBeforeSlide = true);
+    if (mounted) setState(() => _hideLogoBeforeSlide = true); 
+    
+    // 4. Slide Background
     await Future.delayed(const Duration(milliseconds: 600));
+    
+    if (mounted) {
+      setState(() {
+        _blueHeight = screenHeight;
+        _animationCompleted = true; // Selesai intro
+      });
+    }
+  }
 
-    // 5. Background Slide
-    double screenHeight = MediaQuery.of(context).size.height;
-    if (mounted) setState(() => _blueHeight = screenHeight);
-    await Future.delayed(const Duration(milliseconds: 800));
+  // --- LOGIC FORM ---
+  void _openLogin() {
+    setState(() {
+      _isFormOpen = true;
+      _showLoginForm = true;
+    });
+  }
 
-    // 6. Final UI
-    if (mounted) setState(() => _showFinalUI = true);
+  void _openRegister() {
+    setState(() {
+      _isFormOpen = true;
+      _showLoginForm = false;
+    });
+  }
+
+  void _closeForm() {
+    setState(() {
+      _isFormOpen = false;
+      FocusScope.of(context).unfocus(); // Tutup keyboard
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    double fullHeight = MediaQuery.of(context).size.height;
-    double fullWidth = MediaQuery.of(context).size.width;
+    final size = MediaQuery.of(context).size;
+    final double fullHeight = size.height;
+    final double fullWidth = size.width;
+    final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
 
-    // ==========================================================
-    // AREA PENGATURAN MANUAL (TWEAK DISINI JIKA KURANG PAS)
-    // ==========================================================
-    
-    // 1. Ukuran Area Container Animasi
-    const double containerWidth = 320.0; 
-    const double containerHeight = 100.0;
-
-    // 2. Ukuran Objek
-    const double textHeight = 80.0;   // Tinggi gambar teks
-    const double keySizeBig = 100.0;   // Ukuran kunci awal
-    const double keySizeSmall = 80.0; // Ukuran kunci akhir
-
-    // 3. Posisi Akhir Kunci (Mengatur Jarak Kiri-Kanan)
-    // Semakin KECIL angkanya, semakin DEKAT ke teks (kiri)
-    // Semakin BESAR angkanya, semakin JAUH dari teks (kanan)
-    // Sebelumnya sekitar 240, saya turunkan drastis ke 195 agar nempel.
-    const double keyEndPositionLeft = 195.0; 
-
-    // 4. Koreksi Posisi Vertikal (Mengatur Naik-Turun Kunci)
-    // Jika kunci terlihat kurang naik, kurangi angkanya (misal -5.0)
-    // Jika kunci terlihat kurang turun, tambah angkanya (misal 5.0)
-    const double keyVerticalCorrection = 0.0; 
-
-    // ==========================================================
-    // RUMUS POSISI OTOMATIS (JANGAN DIUBAH)
-    // ==========================================================
-    
-    // Posisi Tengah Container
-    const double centerX = (containerWidth / 2);
-    
-    // Posisi Awal Kunci (Tepat di Tengah)
-    const double keyStartPosLeft = (containerWidth - keySizeBig) / 2;
-    
-    // Posisi Vertikal Kunci (Tengah Vertikal)
-    const double keyTopBig = (containerHeight - keySizeBig) / 2;
-    const double keyTopSmall = ((containerHeight - keySizeSmall) / 2) + keyVerticalCorrection;
+    // Posisi Logo: Naik jika form open
+    double logoTopPosition = _isFormOpen ? 60 : (fullHeight / 2) - 60;
+    double logoScale = _isFormOpen ? 0.7 : 1.0; 
 
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: false, 
       body: Stack(
         children: [
-          // --------------------------------------------------
-          // LAYER 1: ANIMASI LOGO (Floating Center)
-          // --------------------------------------------------
-          Center(
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 500),
-              opacity: _hideLogoBeforeSlide ? 0.0 : 1.0,
-              child: SizedBox(
-                width: containerWidth,
-                height: containerHeight,
-                child: Stack(
-                  alignment: Alignment.center, // Memastikan Teks selalu di Center
-                  children: [
-                    
-                    // A. GAMBAR TEKS (Anchor di Tengah)
-                    AnimatedOpacity(
-                      duration: const Duration(milliseconds: 800),
-                      opacity: _showText ? 1.0 : 0.0,
-                      child: Padding(
-                        // Padding kanan ini untuk mengimbangi visual center
-                        // karena nanti ada kunci di kanan
-                        padding: const EdgeInsets.only(right: 30.0), 
-                        child: Image.asset(
-                          'assets/images/text-sarana-biru.png',
-                          height: textHeight,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-
-                    // B. GAMBAR KUNCI (Animasi Posisi)
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 1000),
-                      curve: Curves.fastOutSlowIn,
-                      
-                      // LOGIKA POSISI HORIZONTAL
-                      left: _moveKeyToSide ? keyEndPositionLeft : keyStartPosLeft,
-                      
-                      // LOGIKA POSISI VERTIKAL (Sejajar)
-                      top: _moveKeyToSide ? keyTopSmall : keyTopBig,
-                      
-                      // LOGIKA UKURAN
-                      width: _moveKeyToSide ? keySizeSmall : keySizeBig,
-                      height: _moveKeyToSide ? keySizeSmall : keySizeBig,
-                      
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 500),
-                        opacity: _showKey ? 1.0 : 0.0,
-                        child: Image.asset(
-                          'assets/images/kunci-biru.png',
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // --------------------------------------------------
-          // LAYER 2: BACKGROUND IMAGE (Slide Down)
-          // --------------------------------------------------
+          // ---------------------------------------------
+          // LAYER 1: BACKGROUND BIRU (Dasar)
+          // ---------------------------------------------
           Align(
             alignment: Alignment.topCenter,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 800),
               curve: Curves.easeInOut,
-              width: double.infinity,
-              height: _blueHeight,
+              width: fullWidth,
+              height: _blueHeight, 
               clipBehavior: Clip.hardEdge,
               decoration: const BoxDecoration(),
               child: Stack(
                 children: [
-                  SizedBox(
-                    height: fullHeight,
+                  Image.asset(
+                    'assets/images/bg_welcome.png',
                     width: fullWidth,
-                    child: Image.asset(
-                      'assets/images/bg_welcome.png',
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Container(
                     height: fullHeight,
-                    width: fullWidth,
-                    color: const Color(0xFF003875).withOpacity(0.85),
+                    fit: BoxFit.cover,
                   ),
+                  Container(color: const Color(0xFF003875).withOpacity(0.85)),
                 ],
               ),
             ),
           ),
 
-          // --------------------------------------------------
-          // LAYER 3: FINAL UI (Form Login)
-          // --------------------------------------------------
-          if (_blueHeight > 0)
-            AnimatedOpacity(
-              duration: const Duration(milliseconds: 800),
-              opacity: _showFinalUI ? 1.0 : 0.0,
-              child: _buildFinalUI(context),
+          // ---------------------------------------------
+          // LAYER 2: LOGO (ANIMATED)
+          // ---------------------------------------------
+          if (_animationCompleted)
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeInOut,
+              top: logoTopPosition,
+              left: 0,
+              right: 0,
+              child: GestureDetector(
+                onTap: _isFormOpen ? _closeForm : null, 
+                child: AnimatedScale(
+                  scale: logoScale,
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeInOut,
+                  child: SizedBox(
+                    height: 120,
+                    child: ColorFiltered(
+                      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                      child: Image.asset(
+                        'assets/images/logo-full.png', 
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
+
+          // Intro Logos (Hanya muncul jika intro belum selesai)
+          if (!_animationCompleted) _buildIntroAnimationLogos(),
+
+          // ---------------------------------------------
+          // LAYER 3: TOMBOL AWAL (Login / Register)
+          // ---------------------------------------------
+          if (_animationCompleted)
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+              bottom: _isFormOpen ? -200 : 80, 
+              left: 30,
+              right: 30,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 400),
+                opacity: _isFormOpen ? 0.0 : 1.0,
+                child: IgnorePointer(
+                  ignoring: _isFormOpen, 
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: _openLogin,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF003875),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text("Login", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: OutlinedButton(
+                          onPressed: _openRegister,
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.white),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text("Sign Up", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                      const Text("MyITSSarpras Versi 1.0.0", style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // ---------------------------------------------
+          // LAYER 4: SLIDE UP FORM CONTAINER
+          // ---------------------------------------------
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.fastOutSlowIn,
+            bottom: _isFormOpen ? 0 : -fullHeight, 
+            left: 0,
+            right: 0,
+            height: fullHeight * 0.75, 
+            
+            child: IgnorePointer(
+              ignoring: !_isFormOpen, 
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
+                  ),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.only(bottom: keyboardHeight), 
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: _showLoginForm
+                          ? LoginPage(
+                              key: const ValueKey('login'), 
+                              onSignUpPressed: _openRegister, 
+                            )
+                          : RegisterPage(
+                              key: const ValueKey('register'),
+                              onSignInPressed: _openLogin, 
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildFinalUI(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 30),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Spacer(flex: 3),
-          
-          // --- LOGO PUTIH FINAL ---
-          SizedBox(
-            width: 250, 
-            height: 80,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Teks Putih
-                Padding(
-                  padding: const EdgeInsets.only(right: 30.0), // Samakan dengan animasi
-                  child: ColorFiltered(
-                    colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                    child: Image.asset('assets/images/logo-full.png', height: 120),
+  // Widget Helper: Intro Animation
+  Widget _buildIntroAnimationLogos() {
+    const double containerWidth = 320.0;
+    const double containerHeight = 100.0;
+    const double textHeight = 80.0;
+    const double keySizeBig = 100.0;
+    const double keySizeSmall = 80.0;
+    const double keyEndPositionLeft = 195.0;
+    const double keyStartPosLeft = (containerWidth - keySizeBig) / 2;
+    const double keyTopBig = (containerHeight - keySizeBig) / 2;
+    const double keyTopSmall = (containerHeight - keySizeSmall) / 2;
+
+    return Center(
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 500),
+        opacity: _hideLogoBeforeSlide ? 0.0 : 1.0,
+        child: SizedBox(
+          width: containerWidth,
+          height: containerHeight,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 800),
+                opacity: _showText ? 1.0 : 0.0,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 30.0),
+                  child: Image.asset(
+                    'assets/images/text-sarana-biru.png',
+                    height: textHeight,
+                    fit: BoxFit.contain,
                   ),
                 ),
-                // Kunci Putih (Posisi disesuaikan manual biar mirip animasi)
-              ],
-            ),
-          ),
-
-          const Spacer(flex: 1),
-
-          // Tombol Login
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pushReplacement(
-                  context, 
-                  MaterialPageRoute(builder: (context) => const MainScreen())
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFF003875),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+              ),
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 1000),
+                curve: Curves.fastOutSlowIn,
+                left: _moveKeyToSide ? keyEndPositionLeft : keyStartPosLeft,
+                top: _moveKeyToSide ? keyTopSmall : keyTopBig,
+                width: _moveKeyToSide ? keySizeSmall : keySizeBig,
+                height: _moveKeyToSide ? keySizeSmall : keySizeBig,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 500),
+                  opacity: _showKey ? 1.0 : 0.0,
+                  child: Image.asset(
+                    'assets/images/kunci-biru.png',
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
-              child: const Text("Login", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
+            ],
           ),
-
-          const SizedBox(height: 15),
-
-          // Tombol Signup
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: OutlinedButton(
-              onPressed: () {},
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.white),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text("Signup", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-            ),
-          ),
-
-          const Spacer(flex: 3),
-          const Text("MyITSSarpras Versi 1.0.0", style: TextStyle(color: Colors.white54, fontSize: 12)),
-          const SizedBox(height: 20),
-        ],
+        ),
       ),
     );
   }
