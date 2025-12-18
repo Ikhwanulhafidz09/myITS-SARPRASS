@@ -1,6 +1,6 @@
 # 🏢 myITS Sarpras - Mobile App
 
-> **Final Project Mata Kuliah [Nama Mata Kuliah]** > Semester [Ganjil/Genap] 202X/202X - Institut Teknologi Sepuluh Nopember
+> **Final Project Mata Kuliah Teknologi Berkembang** > Semester 5 2025 - Institut Teknologi Sepuluh Nopember
 
 ![Logo/Banner Aplikasi](assets/images/logo-full.png) 
 
